@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>কারখানা ট্রেনিং ম্যানেজমেন্ট সিস্টেম</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div class="app-wrapper">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🏭</div>
+      <div>
+        <div class="logo-title">ট্রেনিং সিস্টেম</div>
+        <div class="logo-sub">কারখানা ব্যবস্থাপনা</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-btn active" onclick="showPage('dashboard')">📊 ড্যাশবোর্ড</button>
+      <button class="nav-btn" onclick="showPage('workers')">👷 শ্রমিক তালিকা</button>
+      <button class="nav-btn" onclick="showPage('upload')">📤 Excel আপলোড</button>
+      <button class="nav-btn" onclick="showPage('trainings')">📋 ট্রেনিং তালিকা</button>
+      <button class="nav-btn" onclick="showPage('record')">✅ ট্রেনিং রেকর্ড</button>
+      <button class="nav-btn" onclick="showPage('search')">🔍 রেকর্ড দেখুন</button>
+    </nav>
+    
+    <!-- ────────────────────────── -->
+    <!-- User Info এবং Logout -->
+    <!-- ────────────────────────── -->
+    <div class="sidebar-footer">
+      <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #4a90d9;">
+        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">লগইনকৃত ইউজার</div>
+        <div style="font-weight: bold; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px;">👤</span>
+          <span id="currentUser">Admin</span>
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        বছর: 
+        <select id="globalYear" onchange="refreshCurrentPage()" style="background:#1e3a5f;color:#fff;border:1px solid #4a90d9;padding:4px 8px;border-radius:6px;font-size:13px;">
+        </select>
+      </div>
+      
+      <button class="btn-logout" onclick="logout()">🚪 লগআউট করুন</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <!-- TOAST -->
+    <div id="toast" class="toast"></div>
+
+    <!-- ── DASHBOARD ── -->
+    <div id="page-dashboard" class="page active">
+      <h1 class="page-title">📊 ড্যাশবোর্ড</h1>
+      <div class="stats-grid">
+        <div class="stat-card blue"><div class="stat-num" id="stat-workers">0</div><div class="stat-label">মোট শ্রমিক</div></div>
+        <div class="stat-card green"><div class="stat-num" id="stat-trainings">0</div><div class="stat-label">মোট ট্রেনিং</div></div>
+        <div class="stat-card orange"><div class="stat-num" id="stat-records">0</div><div class="stat-label">এ বছর রেকর্ড</div></div>
+      </div>
+      <div class="card mt-20">
+        <h3 class="card-title">📅 মাসিক ট্রেনিং সংখ্যা</h3>
+        <div class="chart-container">
+          <canvas id="monthlyChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── WORKERS ── -->
+    <div id="page-workers" class="page">
+      <div class="page-header">
+        <h1 class="page-title">👷 শ্রমিক তালিকা</h1>
+        <button class="btn btn-primary" onclick="openModal('addWorkerModal')">+ নতুন শ্রমিক</button>
+      </div>
+      <div class="card">
+        <input type="text" id="workerSearch" placeholder="🔍 নাম, পদবী বা কার্ড নম্বর দিয়ে খুঁজুন..." class="search-box" oninput="searchWorkers()">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>নাম</th><th>পদবী</th><th>কার্ড নম্বর</th><th>বিভাগ</th><th>যোগদান</th><th>অ্যাকশন</th></tr></thead>
+            <tbody id="workersTable"><tr><td colspan="7" class="empty-row">লোড হচ্ছে...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── UPLOAD ── -->
+    <div id="page-upload" class="page">
+      <h1 class="page-title">📤 Excel আপলোড</h1>
+      <div class="card">
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('excelFile').click()">
+          <div class="upload-icon">📂</div>
+          <div class="upload-text">Excel ফাইল এখানে ক্লিক করুন বা টেনে আনুন</div>
+          <div class="upload-hint">সমর্থিত: .xlsx, .xls</div>
+        </div>
+        <input type="file" id="excelFile" accept=".xlsx,.xls" style="display:none" onchange="handleFileSelect(this)">
+        <div id="fileInfo" class="file-info hidden"></div>
+        <button class="btn btn-primary btn-block mt-20" onclick="uploadExcel()" id="uploadBtn" disabled>📤 আপলোড করুন</button>
+      </div>
+      <div class="card mt-20">
+        <h3 class="card-title">📝 Excel ফাইলের ফরম্যাট</h3>
+        <p style="color:#ccc;margin-bottom:12px;">আপনার Excel ফাইলে নিচের কলামগুলো থাকতে হবে:</p>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>কলামের নাম</th><th>উদাহরণ</th><th>বাধ্যতামূলক</th></tr></thead>
+            <tbody>
+              <tr><td>Name</td><td>মোঃ রফিকুল ইসলাম</td><td><span class="badge green">হ্যাঁ</span></td></tr>
+              <tr><td>Card Number</td><td>EMP-001</td><td><span class="badge green">হ্যাঁ</span></td></tr>
+              <tr><td>Designation</td><td>সুপারভাইজার</td><td><span class="badge gray">না</span></td></tr>
+              <tr><td>Department</td><td>প্রোডাকশন</td><td><span class="badge gray">না</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TRAININGS ── -->
+    <div id="page-trainings" class="page">
+      <div class="page-header">
+        <h1 class="page-title">📋 ট্রেনিং তালিকা</h1>
+        <button class="btn btn-primary" onclick="openModal('addTrainingModal')">+ নতুন ট্রেনিং</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>ট্রেনিংয়ের নাম</th><th>বিবরণ</th><th>অ্যাকশন</th></tr></thead>
+            <tbody id="trainingsTable"><tr><td colspan="4" class="empty-row">লোড হচ্ছে...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RECORD ── -->
+    <div id="page-record" class="page">
+      <h1 class="page-title">✅ ট্রেনিং রেকর্ড আপডেট</h1>
+
+      <!-- ════════════════════════════════════════════ -->
+      <!-- 🚀 বাল্ক আপডেট সেকশন -->
+      <!-- ════════════════════════════════════════════ -->
+      
+      <div class="card" style="margin-bottom: 20px; border: 2px solid #667eea; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);">
+        <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px 8px 0 0;">
+          <i class="fas fa-upload"></i> 🚀 বাল্ক আপডেট - একসাথে অনেক শ্রমিক
+        </div>
+        <div class="card-body" style="padding: 20px;">
+          <p style="color: #999; margin-bottom: 15px;"><strong>দ্রুত পদ্ধতি:</strong> শুধু কার্ড নম্বর Excel এ লিখুন, বাকি সবকিছু স্বয়ংক্রিয়! ৫০-১০০ জন শ্রমিক ২ মিনিটে আপডেট করুন���</p>
+          
+          <!-- ধাপ ১: Excel আপলোড -->
+          <div style="margin-bottom: 20px;">
+            <h4 style="color: #2196F3; margin-bottom: 10px; font-weight: bold;">📁 ধাপ ১: Excel ফাইল আপলোড করুন (শুধু কার্ড নম্বর)</h4>
+            <form id="bulkUploadForm" enctype="multipart/form-data" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+              <div style="flex: 1; min-width: 250px;">
+                <input type="file" id="bulkFile" accept=".xlsx,.xls" required class="form-input" placeholder="Excel ফাইল নির্বাচন করুন">
+              </div>
+              <button type="submit" class="btn btn-primary" style="padding: 10px 20px; white-space: nowrap;">
+                <i class="fas fa-search"></i> শ্রমিক খুঁজুন
+              </button>
+            </form>
+            <small style="color: #999; display: block; margin-top: 8px;">💡 প্রথম কলামে "কার্ড নম্বর" বা "Card Number" শিরোনাম থাকতে হবে। উদাহরণ: EMP001, EMP002, EMP003...</small>
+            <div id="bulkUploadStatus" style="margin-top: 10px;"></div>
+          </div>
+
+          <!-- ধাপ २: শ্রমিক তালিকা -->
+          <div id="step2Container" style="display:none; margin-bottom: 20px;">
+            <h4 style="color: #4CAF50; margin-bottom: 10px; font-weight: bold;">✓ ধাপ २: পাওয়া গেছে <span id="foundCount">०</span> জন শ্রমিক</h4>
+            <div style="margin-bottom: 10px;">
+              <label style="font-weight: bold;">
+                <input type="checkbox" id="selectAll" onchange="toggleBulkSelectAll()" style="margin-right: 8px;">
+                সবাইকে নির্বাচন করুন / বাদ দিন
+              </label>
+            </div>
+            <div class="table-wrap" style="max-height: 300px; overflow-y: auto; border: 1px solid #444; border-radius: 6px;">
+              <table class="data-table">
+                <thead>
+                  <tr style="position: sticky; top: 0;">
+                    <th style="width: 50px;"><input type="checkbox" id="selectAllHead" onchange="toggleBulkSelectAll()"></th>
+                    <th>কার্ড নম্বর</th>
+                    <th>নাম</th>
+                    <th>পদবী</th>
+                  </tr>
+                </thead>
+                <tbody id="workersList"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ধাপ ३: ট্রেনিং নির্বাচন -->
+          <div id="step3Container" style="display:none; margin-top: 20px;">
+            <h4 style="color: #FF9800; margin-bottom: 10px; font-weight: bold;">⚙️ ধাপ ३: ট্রেনিং এবং তারিখ নির্বাচন করুন</h4>
+            <form id="bulkTrainingForm">
+              <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="form-group">
+                  <label style="font-weight: bold;">ট্রেনিং নির্বাচন করুন *</label>
+                  <select id="trainingSelect" required class="form-input">
+                    <option value="">-- ট্রেনিং নির্বাচন করুন --</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label style="font-weight: bold;">মাস নির্বাচন করুন *</label>
+                  <select id="monthSelect" required class="form-input">
+                    <option value="">-- মাস নির্বাচন করুন --</option>
+                    <option value="1">জানুয়ারি</option>
+                    <option value="2">ফেব্রুয়ারি</option>
+                    <option value="3">মার্চ</option>
+                    <option value="4">এপ্রিল</option>
+                    <option value="5">মে</option>
+                    <option value="6">জুন</option>
+                    <option value="7">জুলাই</option>
+                    <option value="8">আগস্ট</option>
+                    <option value="9">সেপ্টেম্বর</option>
+                    <option value="10">অক্টোবর</option>
+                    <option value="11">নভেম্বর</option>
+                    <option value="12">ডিসেম্বর</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label style="font-weight: bold;">বছর নির্বাচন করুন *</label>
+                  <select id="yearSelect" required class="form-input">
+                    <option value="2025">२०२५</option>
+                    <option value="2026" selected>२०२६</option>
+                    <option value="2027">२०२७</option>
+                    <option value="2028">२०२८</option>
+                    <option value="2029">२०२९</option>
+                    <option value="2030">२०३०</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label style="font-weight: bold;">তারিখ নির্বাচন করুন *</label>
+                  <input type="date" id="trainingDate" required class="form-input" style="padding: 10px; font-size: 16px;">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label style="font-weight: bold;">মন্তব্য (ঐচ্ছিক)</label>
+                <textarea id="remarks" placeholder="উদাহরণ: কারখানা প্রশিক্ষণ, অফিসে দেওয়া হয়েছে..." class="form-input" style="height: 60px;"></textarea>
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: bold; font-size: 16px;">
+                <i class="fas fa-check-circle"></i> <span id="selectedCount">०</span> জন শ্রমিকের ট্রেনিং সম্পন্ন করুন
+              </button>
+            </form>
+            <div id="bulkTrainingStatus" style="margin-top: 15px;"></div>
+          </div>
+
+          <hr style="border: 1px solid #444; margin: 20px 0;">
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════ -->
+      <!-- একবারে একজন শ্রমিকের জন্য আপডেট -->
+      <!-- ════════════════════════════════════════════ -->
+      
+      <div class="card">
+        <h3 style="margin-bottom: 15px; color: #666; font-weight: bold;">বা একবারে একজন শ্রমিকের জন্য আপডেট করুন:</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>শ্রমিক খুঁজুন</label>
+            <input type="text" id="recWorkerSearch" placeholder="নাম বা কার্ড নম্বর..." class="form-input" oninput="searchRecWorker()">
+            <div id="recWorkerDropdown" class="dropdown hidden"></div>
+          </div>
+          <div class="form-group">
+            <label>নির্বাচিত শ্রমিক</label>
+            <div id="selectedWorkerInfo" class="info-box">কোনো শ্রমিক নির্বাচন করা হয়নি</div>
+          </div>
+          <div class="form-group">
+            <label>ট্রেনিং</label>
+            <select id="recTraining" class="form-input"><option value="">-- ট্রেনিং বাছুন --</option></select>
+          </div>
+          <div class="form-group">
+            <label>মাস</label>
+            <select id="recMonth" class="form-input">
+              <option value="1">জানুয়ারি</option><option value="2">ফেব্রুয়ারি</option>
+              <option value="3">মার্চ</option><option value="4">এপ্রিল</option>
+              <option value="5">মে</option><option value="6">জুন</option>
+              <option value="7">জুলাই</option><option value="8">আগস্ট</option>
+              <option value="9">সেপ্টেম্বর</option><option value="10">অক্টোবর</option>
+              <option value="11">নভেম্বর</option><option value="12">ডিসেম্বর</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>তারিখ</label>
+            <input type="date" id="recDate" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>মন্তব্য</label>
+            <input type="text" id="recRemarks" class="form-input" placeholder="ঐচ্ছিক...">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block mt-20" onclick="saveRecord()">✅ রেকর্ড সংরক্ষণ করুন</button>
+      </div>
+
+      <!-- Worker's yearly training grid -->
+      <div id="workerYearGrid" class="hidden mt-20"></div>
+    </div>
+
+    <!-- ── SEARCH ── -->
+    <div id="page-search" class="page">
+      <h1 class="page-title">🔍 ট্রেনিং রেকর্ড দেখুন</h1>
+      <div class="card">
+        <div class="search-filters">
+          <input type="text" id="searchQuery" placeholder="নাম, পদবী বা কার্ড নম্বর..." class="search-box" oninput="searchRecords()">
+          <select id="filterMonth" class="form-input" onchange="searchRecords()">
+            <option value="">সব মাস</option>
+            <option value="1">জানুয়ারি</option><option value="2">ফেব্রুয়ারি</option>
+            <option value="3">মার্চ</option><option value="4">এপ্রিল</option>
+            <option value="5">মে</option><option value="6">জুন</option>
+            <option value="7">জুলাই</option><option value="8">আগস্ট</option>
+            <option value="9">সেপ্টেম্বর</option><option value="10">অক্টোবর</option>
+            <option value="11">নভেম্বর</option><option value="12">ডিসেম্বর</option>
+          </select>
+        </div>
+        <div id="searchResults"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── MODALS ── -->
+<div id="addWorkerModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header"><h3>নতুন শ্রমিক যোগ করুন</h3><button onclick="closeModal('addWorkerModal')">✕</button></div>
+    <div class="form-group"><label>নাম *</label><input type="text" id="wName" class="form-input" placeholder="শ্রমিকের পূর্ণ নাম"></div>
+    <div class="form-group"><label>পদবী</label><input type="text" id="wDes" class="form-input" placeholder="যেমন: অপারেটর, সুপারভাইজার"></div>
+    <div class="form-group"><label>কার্ড নম্বর *</label><input type="text" id="wCard" class="form-input" placeholder="যেমন: EMP-001"></div>
+    <div class="form-group"><label>বিভাগ</label><input type="text" id="wDept" class="form-input" placeholder="যেমন: প্রোডাকশন, কোয়ালিটি"></div>
+    <div class="form-group"><label>যোগদানের তারিখ</label><input type="date" id="wJoin" class="form-input"></div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="closeModal('addWorkerModal')">বাতিল</button>
+      <button class="btn btn-primary" onclick="addWorker()">যোগ করুন</button>
+    </div>
+  </div>
+</div>
+
+<div id="addTrainingModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header"><h3>নতুন ট্রেনিং যোগ করুন</h3><button onclick="closeModal('addTrainingModal')">✕</button></div>
+    <div class="form-group"><label>ট্রেনিংয়ের নাম *</label><input type="text" id="tName" class="form-input" placeholder="ট্রেনিংয়ের নাম লিখুন"></div>
+    <div class="form-group"><label>বিবরণ</label><input type="text" id="tDesc" class="form-input" placeholder="সংক্ষিপ্ত বিবরণ (ঐচ্ছিক)"></div>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="closeModal('addTrainingModal')">বাতিল</button>
+      <button class="btn btn-primary" onclick="addTraining()">যোগ করুন</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirmModal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header"><h3 id="confirmTitle">নিশ্চিত করুন</h3></div>
+    <p id="confirmMsg" style="color:#ccc;padding:0 0 16px 0"></p>
+    <div class="modal-footer">
+      <button class="btn btn-gray" onclick="closeModal('confirmModal')">না</button>
+      <button class="btn btn-danger" id="confirmBtn">হ্যাঁ, মুছুন</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="/static/js/app.js"></script>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- Login Check এবং User Info -->
+<!-- ════════════════════════════════════════════ -->
+<script>
+// পেজ লোড হলে চেক করুন লগইন আছে কিনা
+document.addEventListener('DOMContentLoaded', function() {
+    checkLoginStatus();
+    const today = new Date().toISOString().split('T')[0];
+    const trainingDateInput = document.getElementById('trainingDate');
+    if (trainingDateInput) {
+        trainingDateInput.value = today;
+    }
+    loadBulkTrainings();
+});
+
+// লগইন স্ট্যাটাস চেক করুন
+function checkLoginStatus() {
+    fetch('/api/user-info')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('currentUser').textContent = data.username;
+            } else {
+                // লগইন না হলে লগইন পেজে পাঠান
+                window.location.href = '/login';
+            }
+        })
+        .catch(error => {
+            console.error('Error checking login:', error);
+            window.location.href = '/login';
+        });
+}
+
+// লগআউট করুন
+function logout() {
+    if (confirm('আপনি কি সত্যিই লগআউট করতে চান?')) {
+        fetch('/api/logout', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '/login';
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+}
+</script>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- বাল্ক ট্রেনিং আপডেট - JavaScript -->
+<!-- ════════════════════════════════════════════ -->
+<script>
+// ধাপ ১: Excel আপলোড
+document.getElementById('bulkUploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const file = document.getElementById('bulkFile').files[0];
+    if (!file) {
+        showBulkAlert('bulkUploadStatus', 'ফাইল নির্বাচন করুন', 'danger');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch('/api/bulk-training/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            displayFoundWorkers(result.workers);
+            document.getElementById('step2Container').style.display = 'block';
+            document.getElementById('step3Container').style.display = 'block';
+            showBulkAlert('bulkUploadStatus', `✅ ${result.found} জন শ্রমিক পাওয়া গেছে, ${result.not_found} জন পাওয়া যায়নি`, 'success');
+        } else {
+            showBulkAlert('bulkUploadStatus', result.message, 'danger');
+        }
+    } catch (error) {
+        showBulkAlert('bulkUploadStatus', 'ত্রুটি: ' + error.message, 'danger');
+    }
+});
+
+// শ্রমিক তালিকা প্রদর্শন
+function displayFoundWorkers(workers) {
+    const tbody = document.getElementById('workersList');
+    tbody.innerHTML = '';
+    
+    workers.forEach(worker => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="checkbox" class="workerCheckbox" value="${worker.id}" checked onchange="updateBulkSelectedCount()"></td>
+            <td><strong>${worker.card_number}</strong></td>
+            <td>${worker.name}</td>
+            <td>${worker.designation || '-'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    document.getElementById('foundCount').textContent = workers.length;
+    updateBulkSelectedCount();
+}
+
+// সব নির্বাচন/বাদ করুন
+function toggleBulkSelectAll() {
+    const isChecked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.workerCheckbox').forEach(cb => cb.checked = isChecked);
+    document.getElementById('selectAllHead').checked = isChecked;
+    updateBulkSelectedCount();
+}
+
+// নির্বাচিত সংখ্যা আপডেট
+function updateBulkSelectedCount() {
+    const selected = document.querySelectorAll('.workerCheckbox:checked').length;
+    document.getElementById('selectedCount').textContent = selected;
+}
+
+// ট্রেনিং লোড করুন
+async function loadBulkTrainings() {
+    try {
+        const response = await fetch('/api/trainings');
+        const trainings = await response.json();
+        
+        const select = document.getElementById('trainingSelect');
+        trainings.forEach(training => {
+            const option = document.createElement('option');
+            option.value = training.id;
+            option.textContent = training.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('ত্রুটি:', error);
+    }
+}
+
+// সাবমিট করুন
+document.getElementById('bulkTrainingForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const checkedBoxes = document.querySelectorAll('.workerCheckbox:checked');
+    const worker_ids = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+    
+    if (worker_ids.length === 0) {
+        showBulkAlert('bulkTrainingStatus', 'কোন শ্রমিক নির্বাচন করা হয়নি', 'danger');
+        return;
+    }
+    
+    const training_id = parseInt(document.getElementById('trainingSelect').value);
+    const month = parseInt(document.getElementById('monthSelect').value);
+    const year = parseInt(document.getElementById('yearSelect').value);
+    const training_date = document.getElementById('trainingDate').value;
+    const remarks = document.getElementById('remarks').value;
+    
+    if (!training_id || !month || !training_date) {
+        showBulkAlert('bulkTrainingStatus', 'সকল বাধ্যতামূলক ফিল্ড পূরণ করুন', 'danger');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/bulk-training/confirm', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({worker_ids, training_id, month, year, training_date, remarks})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showBulkAlert('bulkTrainingStatus', `✅ ${result.count} জন শ্রমিকের ট্রেনিং সফলভাবে সংরক্ষিত হয়েছে!`, 'success');
+            
+            setTimeout(() => {
+                document.getElementById('bulkUploadForm').reset();
+                document.getElementById('bulkTrainingForm').reset();
+                document.getElementById('step2Container').style.display = 'none';
+                document.getElementById('step3Container').style.display = 'none';
+                document.getElementById('bulkUploadStatus').innerHTML = '';
+                document.getElementById('bulkTrainingStatus').innerHTML = '';
+            }, 2000);
+        } else {
+            showBulkAlert('bulkTrainingStatus', result.message, 'danger');
+        }
+    } catch (error) {
+        showBulkAlert('bulkTrainingStatus', 'ত্রুটি: ' + error.message, 'danger');
+    }
+});
+
+// Alert দেখান
+function showBulkAlert(elementId, message, type) {
+    const element = document.getElementById(elementId);
+    const alertClass = type === 'danger' ? 'alert-danger' : 'alert-success';
+    element.innerHTML = `<div class="alert ${alertClass}" style="padding: 10px; margin: 0; border-radius: 6px; border-left: 4px solid ${type === 'danger' ? '#f44336' : '#4CAF50'};">${message}</div>`;
+}
+</script>
+
+</body>
+</html>
